@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'homepage.dart';
+import 'onboarding.dart'; // ✅ Added this import
 
 class RegisterScreen extends StatefulWidget {
   const RegisterScreen({super.key});
@@ -52,13 +52,11 @@ class _RegisterScreenState extends State<RegisterScreen> {
     final patientCode = _patientCodeController.text.trim();
 
     try {
-      // Create user with Firebase Auth
       UserCredential userCredential = await _auth.createUserWithEmailAndPassword(
         email: email,
         password: password,
       );
 
-      // Store user data in Firestore
       await _firestore.collection('users').doc(userCredential.user!.uid).set({
         'username': username,
         'email': email,
@@ -68,9 +66,11 @@ class _RegisterScreenState extends State<RegisterScreen> {
       });
 
       if (!mounted) return;
+
+      // ✅ Navigate to OnboardingScreen with username
       Navigator.pushReplacement(
         context,
-        MaterialPageRoute(builder: (context) => HomePage(username: username)),
+        MaterialPageRoute(builder: (_) => OnboardingScreen(username: username)),
       );
     } on FirebaseAuthException catch (e) {
       String message = "Registration failed.";

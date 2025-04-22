@@ -1,20 +1,65 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 
-class HomePage extends StatelessWidget {
-  final String username; // Accept username from registration/login
+class HomePage extends StatefulWidget {
+  final String username;
 
   const HomePage({super.key, required this.username});
 
   @override
+  State<HomePage> createState() => _HomePageState();
+}
+
+class _HomePageState extends State<HomePage> {
+  late DateTime _now;
+  late Timer _timer;
+
+  @override
+  void initState() {
+    super.initState();
+    _now = DateTime.now();
+    _startTimer();
+  }
+
+  void _startTimer() {
+    _timer = Timer.periodic(const Duration(minutes: 1), (_) {
+      final currentTime = DateTime.now();
+      if (_now.day != currentTime.day) {
+        setState(() => _now = currentTime);
+      }
+    });
+  }
+
+  @override
+  void dispose() {
+    _timer.cancel();
+    super.dispose();
+  }
+
+  String _formatDate(DateTime date) {
+    const weekdays = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+    const months = [
+      'January', 'February', 'March', 'April', 'May', 'June',
+      'July', 'August', 'September', 'October', 'November', 'December'
+    ];
+    return "${weekdays[date.weekday - 1]}, ${date.day} ${months[date.month - 1]}";
+  }
+
+  @override
   Widget build(BuildContext context) {
+    final List<DateTime> weekDates = List.generate(
+      5,
+      (index) => _now.subtract(Duration(days: 2 - index)),
+    );
+
     return Scaffold(
       backgroundColor: Colors.white,
       floatingActionButton: FloatingActionButton(
         backgroundColor: Colors.pinkAccent,
         onPressed: () {
-          // Add new medicine reminder
+          // Add medicine reminder logic
         },
-        child: const Icon(Icons.add, size: 30),
+        child: const Icon(Icons.add, size: 30, color: Colors.white),
       ),
       floatingActionButtonLocation: FloatingActionButtonLocation.centerDocked,
       bottomNavigationBar: BottomAppBar(
@@ -24,9 +69,21 @@ class HomePage extends StatelessWidget {
           padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 12),
           child: Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: const [
-              Icon(Icons.home_outlined),
-              Icon(Icons.settings_outlined),
+            children: [
+              IconButton(
+                icon: const Icon(Icons.home_outlined, color: Colors.black),
+                onPressed: () {
+                  // Scroll to today or show home content
+                  setState(() => _now = DateTime.now());
+                },
+              ),
+              IconButton(
+                icon: const Icon(Icons.settings_outlined, color: Colors.black),
+                onPressed: () {
+                  // Navigate to settings (replace with actual nav)
+                  debugPrint("Settings tapped");
+                },
+              ),
             ],
           ),
         ),
@@ -37,12 +94,12 @@ class HomePage extends StatelessWidget {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // Top Greeting Section
+              // Greeting
               Row(
                 children: [
                   const CircleAvatar(
                     radius: 24,
-                    backgroundImage: AssetImage('assets/user.png'), // Add a default image or avatar
+                    backgroundImage: AssetImage('assets/user.png'),
                   ),
                   const SizedBox(width: 12),
                   Expanded(
@@ -52,7 +109,7 @@ class HomePage extends StatelessWidget {
                         children: [
                           const TextSpan(text: "Hey, "),
                           TextSpan(
-                            text: username,
+                            text: widget.username,
                             style: const TextStyle(fontWeight: FontWeight.bold),
                           ),
                           const TextSpan(text: " 👋"),
@@ -60,32 +117,33 @@ class HomePage extends StatelessWidget {
                       ),
                     ),
                   ),
-                  IconButton(
-                    icon: const Icon(Icons.settings),
-                    onPressed: () {
-                      // Settings screen
-                    },
-                  ),
                 ],
               ),
+
               const SizedBox(height: 20),
 
-              // Date Section
-              const Text(
-                "Today, 19 March",
-                style: TextStyle(fontSize: 16, fontWeight: FontWeight.w500),
+              // Today Date
+              Text(
+                "Today, ${_formatDate(_now)}",
+                style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w500),
               ),
+
               const SizedBox(height: 12),
 
+              // Day Selector
               SizedBox(
                 height: 60,
                 child: ListView.builder(
                   scrollDirection: Axis.horizontal,
-                  itemCount: 5,
+                  itemCount: weekDates.length,
                   itemBuilder: (context, index) {
-                    final days = ["Mon", "Tue", "Wed", "Thu", "Fri"];
-                    final dates = [17, 18, 19, 20, 21];
-                    final isSelected = index == 1; // Hardcoded selected
+                    final date = weekDates[index];
+                    final isSelected = date.day == _now.day &&
+                        date.month == _now.month &&
+                        date.year == _now.year;
+
+                    final dayAbbr = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"][date.weekday % 7];
+
                     return Container(
                       margin: const EdgeInsets.only(right: 12),
                       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
@@ -97,7 +155,7 @@ class HomePage extends StatelessWidget {
                         mainAxisAlignment: MainAxisAlignment.center,
                         children: [
                           Text(
-                            dates[index].toString(),
+                            date.day.toString(),
                             style: TextStyle(
                               fontSize: 16,
                               color: isSelected ? Colors.white : Colors.black,
@@ -105,7 +163,7 @@ class HomePage extends StatelessWidget {
                             ),
                           ),
                           Text(
-                            days[index],
+                            dayAbbr,
                             style: TextStyle(
                               fontSize: 14,
                               color: isSelected ? Colors.white : Colors.black,
@@ -120,7 +178,7 @@ class HomePage extends StatelessWidget {
 
               const SizedBox(height: 24),
 
-              // To Take Section Title
+              // To Take Section Header
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: const [
@@ -137,12 +195,12 @@ class HomePage extends StatelessWidget {
 
               const SizedBox(height: 16),
 
-              // Placeholder for Medications List
+              // Placeholder for Med List
               Expanded(
                 child: Center(
                   child: Text(
                     "You have no medications today",
-                    style: TextStyle(color: Colors.grey[600]),
+                    style: TextStyle(color: Colors.grey[600], fontSize: 16),
                   ),
                 ),
               )
