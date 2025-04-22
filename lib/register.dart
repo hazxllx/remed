@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
-import 'homepage.dart'; // Make sure HomePage is implemented and accepts a username
+import 'package:firebase_auth/firebase_auth.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'homepage.dart';
 
 class RegisterScreen extends StatefulWidget {
   const RegisterScreen({super.key});
@@ -10,6 +12,8 @@ class RegisterScreen extends StatefulWidget {
 
 class _RegisterScreenState extends State<RegisterScreen> {
   final _formKey = GlobalKey<FormState>();
+  final _auth = FirebaseAuth.instance;
+  final _firestore = FirebaseFirestore.instance;
 
   final TextEditingController _usernameController = TextEditingController();
   final TextEditingController _emailController = TextEditingController();
@@ -17,27 +21,68 @@ class _RegisterScreenState extends State<RegisterScreen> {
   final TextEditingController _confirmPasswordController = TextEditingController();
   final TextEditingController _patientCodeController = TextEditingController();
 
-  String? _selectedRole;
-  bool get _requiresPatientCode => _selectedRole == 'Nurse' || _selectedRole == 'Family';
-  bool _passwordVisible = false;
-  bool _confirmPasswordVisible = false;
+  String? selectedRole;
+  bool _obscurePassword = true;
+  bool _obscureConfirmPassword = true;
 
-  void _register() {
-    if (_formKey.currentState!.validate()) {
-      Navigator.push(
-        context,
-        MaterialPageRoute(
-          builder: (context) => HomePage(username: _usernameController.text),
-        ),
-      );
-    }
+  final List<String> roles = ['Patient', 'Nurse', 'Family'];
+
+  @override
+  void dispose() {
+    _usernameController.dispose();
+    _emailController.dispose();
+    _passwordController.dispose();
+    _confirmPasswordController.dispose();
+    _patientCodeController.dispose();
+    super.dispose();
   }
 
-  void _registerWithGoogle() {
-    // TODO: Add Google sign-in logic here
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('Google sign-in not implemented')),
-    );
+  bool isValidEmail(String email) {
+    final emailRegex = RegExp(r'^[^@]+@[^@]+\.[^@]+');
+    return emailRegex.hasMatch(email);
+  }
+
+  Future<void> _register() async {
+    if (!_formKey.currentState!.validate()) return;
+
+    final username = _usernameController.text.trim();
+    final email = _emailController.text.trim();
+    final password = _passwordController.text.trim();
+    final role = selectedRole!;
+    final patientCode = _patientCodeController.text.trim();
+
+    try {
+      // Create user with Firebase Auth
+      UserCredential userCredential = await _auth.createUserWithEmailAndPassword(
+        email: email,
+        password: password,
+      );
+
+      // Store user data in Firestore
+      await _firestore.collection('users').doc(userCredential.user!.uid).set({
+        'username': username,
+        'email': email,
+        'role': role,
+        if (role != 'Patient') 'patientCode': patientCode,
+        'createdAt': FieldValue.serverTimestamp(),
+      });
+
+      if (!mounted) return;
+      Navigator.pushReplacement(
+        context,
+        MaterialPageRoute(builder: (context) => HomePage(username: username)),
+      );
+    } on FirebaseAuthException catch (e) {
+      String message = "Registration failed.";
+      if (e.code == 'email-already-in-use') {
+        message = 'Email is already in use.';
+      } else if (e.code == 'weak-password') {
+        message = 'Password is too weak.';
+      }
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(message)));
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text("Error: $e")));
+    }
   }
 
   @override
@@ -45,235 +90,128 @@ class _RegisterScreenState extends State<RegisterScreen> {
     return Scaffold(
       backgroundColor: Colors.white,
       body: SafeArea(
-        child: Center(
-          child: SingleChildScrollView(
-            padding: const EdgeInsets.all(24),
-            child: Form(
-              key: _formKey,
-              child: Column(
-                children: [
-                  Align(
-                    alignment: Alignment.topLeft,
-                    child: IconButton(
-                      icon: const Icon(Icons.arrow_back_ios_new_rounded),
+        child: SingleChildScrollView(
+          padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
+          child: Form(
+            key: _formKey,
+            child: Column(
+              children: [
+                Row(
+                  children: [
+                    IconButton(
+                      icon: const Icon(Icons.arrow_back),
                       onPressed: () => Navigator.pop(context),
                     ),
+                    const SizedBox(width: 8),
+                  ],
+                ),
+                const SizedBox(height: 24),
+                const Align(
+                  alignment: Alignment.centerLeft,
+                  child: Text(
+                    "Hello! Register to get started",
+                    style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold, color: Colors.redAccent),
                   ),
-                  const Align(
-                    alignment: Alignment.centerLeft,
-                    child: Text(
-                      "Hello! Register to get started",
-                      style: TextStyle(
-                        fontSize: 20,
-                        fontWeight: FontWeight.bold,
-                        color: Color(0xFFEB5E5E),
-                      ),
-                    ),
+                ),
+                const SizedBox(height: 32),
+                _buildTextField(
+                  controller: _usernameController,
+                  hintText: "Username",
+                  validator: (value) => value == null || value.trim().isEmpty ? 'Username is required' : null,
+                ),
+                const SizedBox(height: 16),
+                _buildTextField(
+                  controller: _emailController,
+                  hintText: "Email",
+                  validator: (value) {
+                    if (value == null || value.trim().isEmpty) return 'Email is required';
+                    if (!isValidEmail(value.trim())) return 'Enter a valid email';
+                    return null;
+                  },
+                ),
+                const SizedBox(height: 16),
+                _buildTextField(
+                  controller: _passwordController,
+                  hintText: "Password",
+                  obscureText: _obscurePassword,
+                  toggleVisibility: () => setState(() => _obscurePassword = !_obscurePassword),
+                  validator: (value) =>
+                      value == null || value.length < 6 ? 'Password must be at least 6 characters' : null,
+                ),
+                const SizedBox(height: 16),
+                _buildTextField(
+                  controller: _confirmPasswordController,
+                  hintText: "Confirm Password",
+                  obscureText: _obscureConfirmPassword,
+                  toggleVisibility: () => setState(() => _obscureConfirmPassword = !_obscureConfirmPassword),
+                  validator: (value) =>
+                      value != _passwordController.text ? 'Passwords do not match' : null,
+                ),
+                const SizedBox(height: 16),
+                DropdownButtonFormField<String>(
+                  value: selectedRole,
+                  decoration: InputDecoration(
+                    hintText: 'Select Role',
+                    filled: true,
+                    fillColor: Colors.grey[100],
+                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: BorderSide.none),
                   ),
-                  const SizedBox(height: 24),
-
-                  // Username
-                  TextFormField(
-                    controller: _usernameController,
-                    decoration: const InputDecoration(
-                      hintText: "Username",
-                      filled: true,
-                      fillColor: Color(0xFFF5F5F5),
-                      border: OutlineInputBorder(borderSide: BorderSide.none),
-                    ),
-                    validator: (value) => value!.isEmpty ? 'Enter username' : null,
-                  ),
-                  const SizedBox(height: 12),
-
-                  // Email
-                  TextFormField(
-                    controller: _emailController,
-                    keyboardType: TextInputType.emailAddress,
-                    decoration: const InputDecoration(
-                      hintText: "Email",
-                      filled: true,
-                      fillColor: Color(0xFFF5F5F5),
-                      border: OutlineInputBorder(borderSide: BorderSide.none),
-                    ),
-                    validator: (value) => value!.isEmpty ? 'Enter email' : null,
-                  ),
-                  const SizedBox(height: 12),
-
-                  // Password
-                  TextFormField(
-                    controller: _passwordController,
-                    obscureText: !_passwordVisible,
-                    decoration: InputDecoration(
-                      hintText: "Password",
-                      filled: true,
-                      fillColor: const Color(0xFFF5F5F5),
-                      border: const OutlineInputBorder(borderSide: BorderSide.none),
-                      suffixIcon: IconButton(
-                        icon: Icon(
-                          _passwordVisible ? Icons.visibility : Icons.visibility_off,
-                          color: Colors.black,
-                        ),
-                        onPressed: () {
-                          setState(() {
-                            _passwordVisible = !_passwordVisible;
-                          });
-                        },
-                      ),
-                    ),
-                    validator: (value) => value!.isEmpty ? 'Enter password' : null,
-                  ),
-                  const SizedBox(height: 12),
-
-                  // Confirm Password
-                  TextFormField(
-                    controller: _confirmPasswordController,
-                    obscureText: !_confirmPasswordVisible,
-                    decoration: InputDecoration(
-                      hintText: "Confirm password",
-                      filled: true,
-                      fillColor: const Color(0xFFF5F5F5),
-                      border: const OutlineInputBorder(borderSide: BorderSide.none),
-                      suffixIcon: IconButton(
-                        icon: Icon(
-                          _confirmPasswordVisible ? Icons.visibility : Icons.visibility_off,
-                          color: Colors.black,
-                        ),
-                        onPressed: () {
-                          setState(() {
-                            _confirmPasswordVisible = !_confirmPasswordVisible;
-                          });
-                        },
-                      ),
-                    ),
+                  items: roles.map((role) => DropdownMenuItem(value: role, child: Text(role))).toList(),
+                  onChanged: (value) => setState(() => selectedRole = value),
+                  validator: (value) => value == null ? 'Role is required' : null,
+                ),
+                if (selectedRole == 'Nurse' || selectedRole == 'Family') ...[
+                  const SizedBox(height: 16),
+                  _buildTextField(
+                    controller: _patientCodeController,
+                    hintText: "Patient Code",
                     validator: (value) =>
-                        value != _passwordController.text ? 'Passwords do not match' : null,
+                        value == null || value.trim().isEmpty ? 'Patient code is required' : null,
                   ),
-                  const SizedBox(height: 12),
-
-                  // Role Dropdown
-                  DropdownButtonFormField<String>(
-                    value: _selectedRole,
-                    items: const [
-                      DropdownMenuItem(value: 'Patient', child: Text('Patient')),
-                      DropdownMenuItem(value: 'Nurse', child: Text('Nurse')),
-                      DropdownMenuItem(value: 'Family', child: Text('Family')),
-                    ],
-                    onChanged: (value) => setState(() => _selectedRole = value),
-                    decoration: const InputDecoration(
-                      filled: true,
-                      fillColor: Color(0xFFF5F5F5),
-                      hintText: "Select Role",
-                      border: OutlineInputBorder(borderSide: BorderSide.none),
-                    ),
-                    validator: (value) => value == null ? 'Select a role' : null,
-                  ),
-                  const SizedBox(height: 12),
-
-                  // Patient Code (if role requires it)
-                  if (_requiresPatientCode)
-                    TextFormField(
-                      controller: _patientCodeController,
-                      decoration: const InputDecoration(
-                        hintText: "Patient Code",
-                        filled: true,
-                        fillColor: Color(0xFFF5F5F5),
-                        border: OutlineInputBorder(borderSide: BorderSide.none),
-                      ),
-                      validator: (value) =>
-                          _requiresPatientCode && value!.isEmpty ? 'Enter patient code' : null,
-                    ),
-
-                  const SizedBox(height: 24),
-
-                  // Register Button
-                  SizedBox(
-                    width: double.infinity,
-                    child: ElevatedButton(
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: const Color(0xFFEB5E5E),
-                        padding: const EdgeInsets.symmetric(vertical: 14),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(8),
-                        ),
-                      ),
-                      onPressed: _register,
-                      child: const Text(
-                        "Register",
-                        style: TextStyle(fontSize: 16, color: Colors.white),
-                      ),
-                    ),
-                  ),
-
-                  const SizedBox(height: 16),
-
-                  // Or divider
-                  Row(
-                    children: const [
-                      Expanded(child: Divider(color: Colors.grey)),
-                      Padding(
-                        padding: EdgeInsets.symmetric(horizontal: 8),
-                        child: Text("Or", style: TextStyle(color: Colors.grey)),
-                      ),
-                      Expanded(child: Divider(color: Colors.grey)),
-                    ],
-                  ),
-
-                  const SizedBox(height: 16),
-
-                  // Google Sign-in Styled Button
-                  GestureDetector(
-                    onTap: _registerWithGoogle,
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(vertical: 14),
-                      decoration: BoxDecoration(
-                        border: Border.all(color: Color(0xFFEB5E5E)),
-                        borderRadius: BorderRadius.circular(8),
-                        color: Colors.white,
-                      ),
-                      child: Row(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          Image.asset(
-                            'assets/google_icon.png', // Make sure this exists
-                            height: 20,
-                          ),
-                          const SizedBox(width: 8),
-                          const Text(
-                            "Continue with Google",
-                            style: TextStyle(
-                              fontSize: 16,
-                              color: Colors.black87,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ),
-
-                  const SizedBox(height: 16),
-
-                  // Login redirect
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      const Text("Already have an account? "),
-                      GestureDetector(
-                        onTap: () => Navigator.pop(context), // or navigate to LoginScreen
-                        child: const Text(
-                          "Login",
-                          style: TextStyle(
-                            color: Color(0xFFEB5E5E),
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                      ),
-                    ],
-                  )
                 ],
-              ),
+                const SizedBox(height: 24),
+                SizedBox(
+                  width: double.infinity,
+                  child: ElevatedButton(
+                    onPressed: _register,
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: Colors.redAccent,
+                      padding: const EdgeInsets.symmetric(vertical: 14),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                    ),
+                    child: const Text("Register", style: TextStyle(color: Colors.white)),
+                  ),
+                ),
+              ],
             ),
           ),
         ),
+      ),
+    );
+  }
+
+  Widget _buildTextField({
+    required TextEditingController controller,
+    required String hintText,
+    bool obscureText = false,
+    VoidCallback? toggleVisibility,
+    String? Function(String?)? validator,
+  }) {
+    return TextFormField(
+      controller: controller,
+      obscureText: obscureText,
+      validator: validator,
+      decoration: InputDecoration(
+        hintText: hintText,
+        filled: true,
+        fillColor: Colors.grey[100],
+        border: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: BorderSide.none),
+        suffixIcon: toggleVisibility != null
+            ? IconButton(
+                icon: Icon(obscureText ? Icons.visibility_off : Icons.visibility),
+                onPressed: toggleVisibility,
+              )
+            : null,
       ),
     );
   }

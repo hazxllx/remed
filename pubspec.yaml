@@ -10,6 +10,11 @@ environment:
 dependencies:
   flutter:
     sdk: flutter
+  firebase_core: ^2.10.0
+  firebase_auth: ^4.7.0
+  google_sign_in: ^5.4.0
+  cloud_firestore: ^4.5.0
+  shared_preferences: ^2.2.2
 
 flutter:
   uses-material-design: true
@@ -17,9 +22,11 @@ flutter:
     - assets/logo.png
     - assets/login_pic.png
     - assets/google_icon.png
+    - assets/ob_bg1.png
+    - assets/ob_bg2.png
+    - assets/ob_bg3.png
 
 dev_dependencies:
   flutter_test:
     sdk: flutter
   flutter_lints: ^5.0.0
-
