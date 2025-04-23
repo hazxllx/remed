@@ -109,7 +109,7 @@ class _HomePageState extends State<HomePage> {
       floatingActionButton: FloatingActionButton.extended(
         backgroundColor: Colors.redAccent,
         icon: const Icon(Icons.add),
-        label: const Text('Add Reminder'),
+        label: const Text('Add Medicine'),
         onPressed: () {},
       ),
       floatingActionButtonLocation: FloatingActionButtonLocation.endFloat,

@@ -1,32 +1,30 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_core/firebase_core.dart';
-import 'firebase_options.dart'; // Ensure this is generated via flutterfire configure
-import 'package:shared_preferences/shared_preferences.dart'; // <-- Add this import
+import 'package:shared_preferences/shared_preferences.dart';
+import 'firebase_options.dart';
 
-import 'splash_welcome.dart'; // Make sure this file exists
+import 'splash_welcome.dart';
 import 'login.dart' as login;
 import 'register.dart' as register;
-import 'homepage.dart'; // Ensure HomePage accepts a username parameter
-import 'onboarding.dart'; // Import OnboardingScreen
+import 'homepage.dart';
+import 'onboarding.dart';
+import 'add_medicine.dart'; // ✅ Ensure this is included
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await Firebase.initializeApp(
-    options: DefaultFirebaseOptions.currentPlatform, // ✅ Proper Firebase init
+    options: DefaultFirebaseOptions.currentPlatform,
   );
-  
-  // Fetch the onboarding status from SharedPreferences
+
   SharedPreferences prefs = await SharedPreferences.getInstance();
   bool onboardingShown = prefs.getBool('onboardingShown') ?? false;
 
-  // Pass the onboarding status to MyApp
   runApp(MyApp(onboardingShown: onboardingShown));
 }
 
 class MyApp extends StatelessWidget {
   final bool onboardingShown;
 
-  // Constructor expects the 'onboardingShown' parameter
   const MyApp({super.key, required this.onboardingShown});
 
   @override
@@ -38,8 +36,10 @@ class MyApp extends StatelessWidget {
         colorScheme: ColorScheme.fromSeed(seedColor: Colors.red),
         useMaterial3: true,
       ),
-      home: onboardingShown ? const SplashScreen() : const OnboardingScreen(),
+      initialRoute: onboardingShown ? '/splash' : '/onboarding',
       routes: {
+        '/onboarding': (context) => const OnboardingScreen(),
+        '/splash': (context) => const SplashScreen(),
         '/login': (_) => const login.LoginScreen(),
         '/register': (_) => const register.RegisterScreen(),
         '/home': (context) {
@@ -47,6 +47,7 @@ class MyApp extends StatelessWidget {
           final username = args?['username'] ?? 'User';
           return HomePage(username: username);
         },
+        '/addMedicine': (_) => const AddMedicinePage(), 
       },
     );
   }
