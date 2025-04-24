@@ -1,7 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
-// For time formatting
+
+// Import intl package for time formatting
 
 class AddMedicinePage extends StatefulWidget {
   const AddMedicinePage({super.key});
@@ -32,7 +33,7 @@ class _AddMedicinePageState extends State<AddMedicinePage> {
     }
   }
 
-  // Method to save medicine
+  // Method to save medicine to Firestore
   void _saveMedicine() async {
     final name = _nameController.text.trim();
     final dose = _doseController.text.trim();
@@ -67,6 +68,7 @@ class _AddMedicinePageState extends State<AddMedicinePage> {
           'type': newMedicine.type,
           'dose': newMedicine.dose,
           'amount': newMedicine.amount,
+          // Convert reminder times to string (e.g., "08:00 AM")
           'reminderTimes': newMedicine.reminderTimes.map((e) => e.format(context)).toList(),
         });
 
@@ -94,142 +96,81 @@ class _AddMedicinePageState extends State<AddMedicinePage> {
     return Scaffold(
       appBar: AppBar(
         title: const Text('Add Medicine'),
-        backgroundColor: Color(0xFFEB5E5E), 
+        backgroundColor: Colors.pinkAccent,
       ),
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(20),
         child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             // Medicine Name
-            _buildInputField(
+            TextField(
               controller: _nameController,
-              labelText: 'Medicine Name',
-              hintText: 'Enter the medicine name',
+              decoration: const InputDecoration(labelText: 'Medicine Name'),
             ),
             const SizedBox(height: 12),
 
             // Medicine Type Dropdown
-            _buildDropdownField(),
+            DropdownButtonFormField<String>(
+              value: _selectedType,
+              items: _medicineTypes.map((type) {
+                return DropdownMenuItem(value: type, child: Text(type));
+              }).toList(),
+              onChanged: (value) => setState(() => _selectedType = value!),
+              decoration: const InputDecoration(labelText: 'Medicine Type'),
+            ),
             const SizedBox(height: 12),
 
             // Dosage
-            _buildInputField(
+            TextField(
               controller: _doseController,
-              labelText: 'Dosage (e.g. 500mg)',
-              hintText: 'Enter the dosage',
+              decoration: const InputDecoration(labelText: 'Dosage (e.g. 500mg)'),
             ),
             const SizedBox(height: 12),
 
             // Amount
-            _buildInputField(
+            TextField(
               controller: _amountController,
-              labelText: 'Amount',
-              hintText: 'Enter the amount',
               keyboardType: TextInputType.number,
+              decoration: const InputDecoration(labelText: 'Amount'),
             ),
             const SizedBox(height: 20),
 
             // Set Reminder Toggle
-            _buildReminderSwitch(),
+            SwitchListTile(
+              title: const Text('Set Reminder'),
+              value: _reminderOn,
+              onChanged: (value) => setState(() => _reminderOn = value),
+            ),
 
             // Show reminder times if reminder is turned on
-            if (_reminderOn) _buildReminderTimes(),
-
+            if (_reminderOn)
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  // List reminder times
+                  ..._reminderTimes.map((time) => Text('• ${time.format(context)}')),
+                  const SizedBox(height: 8),
+                  // Add new reminder time button
+                  ElevatedButton.icon(
+                    onPressed: _pickTime,
+                    icon: const Icon(Icons.access_time),
+                    label: const Text('Add Time'),
+                    style: ElevatedButton.styleFrom(backgroundColor: Colors.redAccent),
+                  ),
+                ],
+              ),
             const SizedBox(height: 30),
 
             // Save Button
-            _buildSaveButton(),
+            ElevatedButton(
+              onPressed: _saveMedicine,
+              child: const Text('Save Medicine'),
+              style: ElevatedButton.styleFrom(
+                minimumSize: const Size.fromHeight(50),
+                backgroundColor: Colors.pinkAccent,
+              ),
+            )
           ],
-        ),
-      ),
-    );
-  }
-
-  // Input field widget to reduce redundancy
-  Widget _buildInputField({
-    required TextEditingController controller,
-    required String labelText,
-    required String hintText,
-    TextInputType keyboardType = TextInputType.text,
-  }) {
-    return TextField(
-      controller: controller,
-      decoration: InputDecoration(
-        labelText: labelText,
-        hintText: hintText,
-        border: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(10),
-          borderSide: BorderSide(color: Colors.grey.shade300),
-        ),
-        filled: true,
-        fillColor: Colors.grey.shade100,
-      ),
-      keyboardType: keyboardType,
-    );
-  }
-
-  // Dropdown field for selecting medicine type
-  Widget _buildDropdownField() {
-    return DropdownButtonFormField<String>(
-      value: _selectedType,
-      items: _medicineTypes.map((type) {
-        return DropdownMenuItem(value: type, child: Text(type));
-      }).toList(),
-      onChanged: (value) => setState(() => _selectedType = value!),
-      decoration: InputDecoration(
-        labelText: 'Medicine Type',
-        border: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(10),
-          borderSide: BorderSide(color: Colors.grey.shade300),
-        ),
-        filled: true,
-        fillColor: Colors.grey.shade100,
-      ),
-    );
-  }
-
-  // Reminder switch widget
-  Widget _buildReminderSwitch() {
-    return SwitchListTile(
-      title: const Text('Set Reminder'),
-      value: _reminderOn,
-      onChanged: (value) => setState(() => _reminderOn = value),
-      activeColor: Color.fromARGB(255, 236, 75, 75),
-    );
-  }
-
-  // Show reminder times if reminder is turned on
-  Widget _buildReminderTimes() {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        // List reminder times
-        ..._reminderTimes.map((time) => Text('• ${time.format(context)}')),
-        const SizedBox(height: 8),
-        ElevatedButton.icon(
-          onPressed: _pickTime,
-          icon: const Icon(Icons.access_time),
-          label: const Text('Add Time'),
-          style: ElevatedButton.styleFrom(
-            backgroundColor: Color(0xFFEB5E5E),
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
-          ),
-        ),
-      ],
-    );
-  }
-
-  // Save button with a more modern style
-  Widget _buildSaveButton() {
-    return ElevatedButton(
-      onPressed: _saveMedicine,
-      child: const Text('Save Medicine'),
-      style: ElevatedButton.styleFrom(
-        minimumSize: const Size.fromHeight(50), backgroundColor: Color(0xFFEB5E5E), // Primary color for the button
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(12), // Rounded corners
         ),
       ),
     );
