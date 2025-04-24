@@ -27,9 +27,18 @@ android {
         versionName = flutter.versionName
     }
 
+    signingConfigs {
+        create("release") {
+            storeFile = file("path/to/your/keystore.jks")  // Replace with the path to your keystore
+            storePassword = "your_keystore_password"  // Replace with your keystore password
+            keyAlias = "your_key_alias"  // Replace with your key alias
+            keyPassword = "your_key_password"  // Replace with your key password
+        }
+    }
+
     buildTypes {
         release {
-            signingConfig = signingConfigs.getByName("debug") // Replace with release signingConfig
+            signingConfig = signingConfigs.getByName("release")  // Use the release signing config
         }
     }
 }

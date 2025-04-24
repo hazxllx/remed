@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 class SplashScreen extends StatelessWidget {
   const SplashScreen({super.key});
@@ -46,6 +47,12 @@ class SplashScreen extends StatelessWidget {
 class WelcomeScreen extends StatelessWidget {
   const WelcomeScreen({super.key});
 
+  Future<void> _completeOnboarding(BuildContext context, String route) async {
+    SharedPreferences prefs = await SharedPreferences.getInstance();
+    await prefs.setBool('onboardingShown', true);
+    Navigator.pushNamed(context, route);
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -87,9 +94,7 @@ class WelcomeScreen extends StatelessWidget {
                       borderRadius: BorderRadius.circular(8),
                     ),
                   ),
-                  onPressed: () {
-                    Navigator.pushNamed(context, '/login');
-                  },
+                  onPressed: () => _completeOnboarding(context, '/login'),
                   child: const Text(
                     'Login',
                     style: TextStyle(fontSize: 18, color: Colors.white),
@@ -108,9 +113,7 @@ class WelcomeScreen extends StatelessWidget {
                       borderRadius: BorderRadius.circular(8),
                     ),
                   ),
-                  onPressed: () {
-                    Navigator.pushNamed(context, '/register');
-                  },
+                  onPressed: () => _completeOnboarding(context, '/register'),
                   child: const Text('Register', style: TextStyle(fontSize: 18)),
                 ),
               ),
