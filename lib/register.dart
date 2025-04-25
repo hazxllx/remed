@@ -3,7 +3,6 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:google_sign_in/google_sign_in.dart';
 import 'onboarding.dart';
-import 'add_medicine.dart'; 
 
 class RegisterScreen extends StatefulWidget {
   const RegisterScreen({super.key});
@@ -28,8 +27,6 @@ class _RegisterScreenState extends State<RegisterScreen> {
   bool _obscureConfirmPassword = true;
 
   final List<String> roles = ['Patient', 'Nurse', 'Family'];
-
-  Medicine? _selectedMedicine;
 
   @override
   void dispose() {
@@ -67,16 +64,6 @@ class _RegisterScreenState extends State<RegisterScreen> {
         'role': role,
         if (role != 'Patient') 'patientCode': patientCode,
         'createdAt': FieldValue.serverTimestamp(),
-        if (_selectedMedicine != null)
-          'medicine': {
-            'name': _selectedMedicine!.name,
-            'type': _selectedMedicine!.type,
-            'dose': _selectedMedicine!.dose,
-            'amount': _selectedMedicine!.amount,
-            'reminderTimes': _selectedMedicine!.reminderTimes
-                .map((t) => '${t.hour}:${t.minute}')
-                .toList(),
-          },
       });
 
       if (!mounted) return;
@@ -248,42 +235,6 @@ class _RegisterScreenState extends State<RegisterScreen> {
                     ),
                   ),
                 ),
-                const SizedBox(height: 16),
-                SizedBox(
-                  width: double.infinity,
-                  child: ElevatedButton.icon(
-                    icon: const Icon(Icons.alarm_add),
-                    label: const Text("Add Reminder"),
-                    onPressed: () async {
-                      final result = await Navigator.push(
-                        context,
-                        MaterialPageRoute(builder: (_) => const AddMedicinePage()),
-                      );
-
-                      if (result != null && result is Medicine) {
-                        setState(() {
-                          _selectedMedicine = result;
-                        });
-                      }
-                    },
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: Colors.pinkAccent,
-                      padding: const EdgeInsets.symmetric(vertical: 14),
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-                    ),
-                  ),
-                ),
-                if (_selectedMedicine != null) ...[
-                  const SizedBox(height: 16),
-                  const Text("Selected Reminder:", style: TextStyle(fontWeight: FontWeight.bold)),
-                  Text("Name: ${_selectedMedicine!.name}"),
-                  Text("Dose: ${_selectedMedicine!.dose}"),
-                  Text("Amount: ${_selectedMedicine!.amount}"),
-                  if (_selectedMedicine!.reminderTimes.isNotEmpty) ...[
-                    const Text("Times:"),
-                    ..._selectedMedicine!.reminderTimes.map((t) => Text("• ${t.format(context)}")),
-                  ]
-                ],
                 const SizedBox(height: 16),
                 Row(
                   mainAxisAlignment: MainAxisAlignment.center,

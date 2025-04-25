@@ -1,3 +1,4 @@
+//updated homepage
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
@@ -41,10 +42,6 @@ class _HomePageState extends State<HomePage> {
     super.dispose();
   }
 
-  // Format the current date to match Firestore format
-  String _formattedDate() {
-    return "${_now.year.toString().padLeft(4, '0')}-${_now.month.toString().padLeft(2, '0')}-${_now.day.toString().padLeft(2, '0')}";
-  }
 
   // Use a Stream to get real-time updates from Firestore
   Stream<List<Map<String, dynamic>>> _getRemindersStream() {
@@ -54,8 +51,7 @@ class _HomePageState extends State<HomePage> {
     return FirebaseFirestore.instance
         .collection('users')
         .doc(uid)
-        .collection('reminders')
-        .where('date', isEqualTo: _formattedDate()) // Only fetch reminders for today
+        .collection('medicines')
         .snapshots()
         .map((snapshot) {
       return snapshot.docs.map((doc) {

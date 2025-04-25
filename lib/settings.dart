@@ -1,22 +1,7 @@
+//settings
+import 'package:firebase_auth/firebase_auth.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
-import 'package:shared_preferences/shared_preferences.dart';
-
-void main() {
-  runApp(MyApp());
-}
-
-class MyApp extends StatelessWidget {
-  @override
-  Widget build(BuildContext context) {
-    return MaterialApp(
-      title: 'Settings Example',
-      theme: ThemeData(
-        primarySwatch: Colors.blue,
-      ),
-      home: SettingsPage(),
-    );
-  }
-}
 
 class SettingsPage extends StatefulWidget {
   @override
@@ -24,39 +9,114 @@ class SettingsPage extends StatefulWidget {
 }
 
 class _SettingsPageState extends State<SettingsPage> {
-  bool _darkMode = false;
-  bool _notificationsEnabled = true;
-  String _selectedLanguage = 'English';
+  String username = 'Current Username'; // Example initial username
+  String password = '********'; // Example initial password
+  TextEditingController usernameController = TextEditingController();
+  TextEditingController passwordController = TextEditingController();
 
-  // Simulating saved preferences (You can replace this with actual persistent storage)
-  void _savePreferences() async {
-    SharedPreferences prefs = await SharedPreferences.getInstance();
-    prefs.setBool('darkMode', _darkMode);
-    prefs.setBool('notificationsEnabled', _notificationsEnabled);
-    prefs.setString('language', _selectedLanguage);
-    print('Preferences saved');
+  final FirebaseAuth _auth = FirebaseAuth.instance;
+  final FirebaseFirestore _firestore = FirebaseFirestore.instance;
+
+  @override
+  void initState() {
+    super.initState();
+    loadUserData();
   }
 
-  void _clearPreferences() async {
-    SharedPreferences prefs = await SharedPreferences.getInstance();
-    prefs.clear(); // Clears all stored preferences
-    print('Preferences cleared');
+  // Load username from Firestore and set the controller
+  void loadUserData() async {
+    User? user = _auth.currentUser;
+    if (user != null) {
+      // Load the username from Firestore
+      DocumentSnapshot snapshot = await _firestore.collection('users').doc(user.uid).get();
+      if (snapshot.exists) {
+        setState(() {
+          username = snapshot['username'];
+          usernameController.text = username;
+        });
+      }
+    }
   }
 
-  void _logout() {
-    // Optionally, perform any cleanup or navigate to the login screen
-    _clearPreferences(); // Clear preferences when logging out
+  // Update username in Firestore
+  void updateUsername() async {
+    User? user = _auth.currentUser;
+    if (user != null) {
+      await _firestore.collection('users').doc(user.uid).update({
+        'username': usernameController.text,
+      });
+      setState(() {
+        username = usernameController.text;
+      });
+    }
+  }
 
-    // Show a snackbar or confirmation (you can also navigate to a login screen here)
-    ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-      content: Text("You have been logged out."),
-    ));
+  // Update password using Firebase Authentication
+  void updatePassword() async {
+    User? user = _auth.currentUser;
+    if (user != null) {
+      String newPassword = passwordController.text;
+      try {
+        await user.updatePassword(newPassword);
+        await _auth.currentUser?.reload(); // Reload the current user after password change
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text("Password updated successfully")));
+      } catch (e) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text("Error updating password")));
+      }
+    }
+  }
 
-    // Navigate to login screen (for example, if you have a LoginPage)
-    // Navigator.pushReplacement(
-    //   context,
-    //   MaterialPageRoute(builder: (context) => LoginPage()),
-    // );
+  // Logout functionality
+  void logout() async {
+    await _auth.signOut();
+    Navigator.pop(context); // Navigate back to the login screen
+  }
+
+  // Delete the user's account from Firebase and Firestore
+  void deleteAccount() async {
+    User? user = _auth.currentUser;
+    if (user != null) {
+      try {
+        // Delete the user's document from Firestore
+        await _firestore.collection('users').doc(user.uid).delete();
+
+        // Delete the user's account from Firebase Authentication
+        await user.delete();
+
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text("Account deleted successfully")));
+        Navigator.pop(context); // Navigate back to the login screen after account deletion
+      } catch (e) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text("Error deleting account")));
+      }
+    }
+  }
+
+  // Show confirmation dialog for account deletion
+  void confirmDeleteAccount() {
+    showDialog(
+      context: context,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          title: Text("Delete Account"),
+          content: Text("Are you sure you want to delete your account? This action cannot be undone."),
+          actions: <Widget>[
+            TextButton(
+              child: Text("Cancel"),
+              onPressed: () {
+                Navigator.of(context).pop(); // Close the dialog
+              },
+            ),
+            TextButton(
+              child: Text("Delete"),
+              onPressed: () {
+                deleteAccount();
+                Navigator.of(context).pop(); // Close the dialog after action
+              },
+            ),
+          ],
+        );
+      },
+    );
   }
 
   @override
@@ -64,116 +124,121 @@ class _SettingsPageState extends State<SettingsPage> {
     return Scaffold(
       appBar: AppBar(
         title: Text('Settings'),
+        backgroundColor: Colors.red, // Customize the app bar color as needed
       ),
-      body: ListView(
-        padding: EdgeInsets.all(16),
-        children: [
-          // Theme Toggle
-          ListTile(
-            title: Text('Dark Mode'),
-            trailing: Switch(
-              value: _darkMode,
-              onChanged: (value) {
-                setState(() {
-                  _darkMode = value;
-                });
-                _savePreferences();
-              },
-            ),
-          ),
-
-          // Notification Toggle
-          ListTile(
-            title: Text('Enable Notifications'),
-            trailing: Switch(
-              value: _notificationsEnabled,
-              onChanged: (value) {
-                setState(() {
-                  _notificationsEnabled = value;
-                });
-                _savePreferences();
-              },
-            ),
-          ),
-
-          // Language Selector
-          ListTile(
-            title: Text('Language'),
-            subtitle: Text(_selectedLanguage),
-            trailing: Icon(Icons.arrow_forward),
-            onTap: () async {
-              String? newLang = await showDialog<String>(
-                context: context,
-                builder: (BuildContext context) {
-                  return AlertDialog(
-                    title: Text('Choose Language'),
-                    content: Column(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        ListTile(
-                          title: Text('English'),
-                          onTap: () => Navigator.pop(context, 'English'),
-                        ),
-                        ListTile(
-                          title: Text('Spanish'),
-                          onTap: () => Navigator.pop(context, 'Spanish'),
-                        ),
-                        ListTile(
-                          title: Text('French'),
-                          onTap: () => Navigator.pop(context, 'French'),
-                        ),
-                      ],
-                    ),
-                  );
+      body: Padding(
+        padding: const EdgeInsets.all(16.0),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: <Widget>[
+            // Account Info Section
+            Card(
+              margin: EdgeInsets.symmetric(vertical: 10),
+              child: ListTile(
+                leading: Icon(Icons.account_circle),
+                title: Text('Account Info'),
+                subtitle: Text('Edit your personal and delivery info'),
+                onTap: () {
+                  // Add navigation or functionality here if needed
                 },
-              );
-
-              if (newLang != null) {
-                setState(() {
-                  _selectedLanguage = newLang;
-                });
-                _savePreferences();
-              }
-            },
-          ),
-
-          // Privacy Settings Section
-          Padding(
-            padding: const EdgeInsets.symmetric(vertical: 8.0),
-            child: Text(
-              'Privacy Settings',
-              style: Theme.of(context).textTheme.titleLarge,
-            ),
-          ),
-          ListTile(
-            title: Text('Two-Factor Authentication'),
-            trailing: Icon(Icons.lock),
-            onTap: () {
-              // Navigate to two-factor authentication screen (not implemented here)
-            },
-          ),
-          ListTile(
-            title: Text('Change Password'),
-            trailing: Icon(Icons.password),
-            onTap: () {
-              // Navigate to change password screen (not implemented here)
-            },
-          ),
-
-          // Logout Button
-          Padding(
-            padding: const EdgeInsets.symmetric(vertical: 16.0),
-            child: ElevatedButton(
-              onPressed: _logout,
-              child: Text('Logout'),
-              style: ElevatedButton.styleFrom(
-                backgroundColor: Colors.red, // Red color for the logout button
-                padding: EdgeInsets.symmetric(vertical: 12),
-                textStyle: TextStyle(fontSize: 16),
               ),
             ),
-          ),
-        ],
+
+            // Medicine Alerts Section
+            Card(
+              margin: EdgeInsets.symmetric(vertical: 10),
+              child: ListTile(
+                leading: Icon(Icons.notifications),
+                title: Text('Medicine Alerts'),
+                subtitle: Text('Configure how your alerts are received'),
+                onTap: () {
+                  // Add functionality for medicine alerts if needed
+                },
+              ),
+            ),
+
+            // My Inventory Section
+            Card(
+              margin: EdgeInsets.symmetric(vertical: 10),
+              child: ListTile(
+                leading: Icon(Icons.medical_services),
+                title: Text('My Inventory'),
+                subtitle: Text('Update medicines and inventories'),
+                onTap: () {
+                  // Add functionality for inventory management if needed
+                },
+              ),
+            ),
+
+            // Security & Data Section
+            Card(
+              margin: EdgeInsets.symmetric(vertical: 10),
+              child: ListTile(
+                leading: Icon(Icons.security),
+                title: Text('Security & Data'),
+                subtitle: Text('Manage all of your personal information'),
+                onTap: () {
+                  // Add functionality for security & data if needed
+                },
+              ),
+            ),
+
+            // Username Change Section
+            Card(
+              margin: EdgeInsets.symmetric(vertical: 10),
+              child: ListTile(
+                leading: Icon(Icons.person),
+                title: Text('Change Username'),
+                subtitle: TextField(
+                  controller: usernameController,
+                  decoration: InputDecoration(hintText: 'Enter new username'),
+                ),
+                trailing: IconButton(
+                  icon: Icon(Icons.check),
+                  onPressed: updateUsername,
+                ),
+              ),
+            ),
+
+            // Password Change Section
+            Card(
+              margin: EdgeInsets.symmetric(vertical: 10),
+              child: ListTile(
+                leading: Icon(Icons.lock),
+                title: Text('Change Password'),
+                subtitle: TextField(
+                  controller: passwordController,
+                  obscureText: true,
+                  decoration: InputDecoration(hintText: 'Enter new password'),
+                ),
+                trailing: IconButton(
+                  icon: Icon(Icons.check),
+                  onPressed: updatePassword,
+                ),
+              ),
+            ),
+
+            // Logout Section
+            Card(
+              margin: EdgeInsets.symmetric(vertical: 10),
+              child: ListTile(
+                leading: Icon(Icons.exit_to_app),
+                title: Text('Logout'),
+                onTap: logout,
+              ),
+            ),
+
+            // Delete Account Section
+            Card(
+              margin: EdgeInsets.symmetric(vertical: 10),
+              child: ListTile(
+                leading: Icon(Icons.delete),
+                title: Text('Delete Account'),
+                onTap: confirmDeleteAccount,
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
